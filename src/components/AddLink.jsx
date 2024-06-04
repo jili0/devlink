@@ -24,7 +24,10 @@ const AddLink = () => {
       category: link.category,
     };
     try {
-      const addLink = await axios.post("http://localhost:3000/links", data);
+      const addLink = await axios.post(
+        "https://devlink-api-0n9z.onrender.com/links/",
+        data
+      );
       console.log(addLink.data);
     } catch (error) {
       console.error(error);
