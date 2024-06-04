@@ -4,7 +4,9 @@ import axios from "axios";
 function LinkContainer({ id }) {
   const [items, setItems] = useState([]);
   const fetchData = async () => {
-    const res = await axios.get("http://localhost:3000/links/");
+    const res = await axios.get(
+      "https://devlink-api-0n9z.onrender.com:3000/links/"
+    );
     setItems(res.data);
   };
   useEffect(() => {
@@ -14,7 +16,9 @@ function LinkContainer({ id }) {
   const handleDelete = async (e) => {
     const key = e.target.id;
     try {
-      await axios.delete(`http://localhost:3000/links/${key}`);
+      await axios.delete(
+        `https://devlink-api-0n9z.onrender.com:3000/links/${key}`
+      );
       window.location.reload();
     } catch (error) {
       console.error(error);
