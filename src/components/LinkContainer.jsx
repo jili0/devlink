@@ -5,7 +5,7 @@ function LinkContainer({ id }) {
   const [items, setItems] = useState([]);
   const fetchData = async () => {
     const res = await axios.get(
-      "https://devlink-api-0n9z.onrender.com:3000/links/"
+      "https://devlink-api-0n9z.onrender.com/links/"
     );
     setItems(res.data);
   };
@@ -17,7 +17,7 @@ function LinkContainer({ id }) {
     const key = e.target.id;
     try {
       await axios.delete(
-        `https://devlink-api-0n9z.onrender.com:3000/links/${key}`
+        `https://devlink-api-0n9z.onrender.com/links/${key}`
       );
       window.location.reload();
     } catch (error) {
