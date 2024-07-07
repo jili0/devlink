@@ -2,12 +2,12 @@ import LinkContainer from "./LinkContainer";
 
 function Links() {
   return (
-    <main>
+    <div className="links">
       <LinkContainer id="work" />
       <LinkContainer id="utilities" />
       <LinkContainer id="design" />
       <LinkContainer id="others" />
-    </main>
+    </div>
   );
 }
 

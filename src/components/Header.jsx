@@ -3,7 +3,15 @@ import AddLink from "./AddLink";
 function Header() {
   return (
     <header>
-      <h1>DevLink</h1>
+      <div>
+        <h1>DevLink</h1>
+        <nav>
+          <a href="">Notes</a>
+          <a href="">About</a>
+          <a href="">Contact</a>
+        </nav>
+      </div>
+
       <AddLink />
     </header>
   );
