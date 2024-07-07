@@ -4,8 +4,8 @@ import axios from "axios";
 function NoteContainer() {
   const [notes, setNotes] = useState([]);
   const fetchData = async () => {
-    const res = await axios.get("http://localhost:3000/notes");
-    // const res = await axios.get("https://devlink-api-0n9z.onrender.com/notes/");
+    // const res = await axios.get("http://localhost:3000/notes");
+    const res = await axios.get("https://devlink-api-0n9z.onrender.com/notes/");
     setNotes(res.data);
   };
   useEffect(() => {
@@ -15,8 +15,8 @@ function NoteContainer() {
   const handleDelete = async (e) => {
     const key = e.target.id;
     try {
-      await axios.delete(`http://localhost:3000/notes/${key}`);
-      // await axios.delete(`https://devlink-api-0n9z.onrender.com/notes/${key}`);
+      // await axios.delete(`http://localhost:3000/notes/${key}`);
+      await axios.delete(`https://devlink-api-0n9z.onrender.com/notes/${key}`);
       window.location.reload();
     } catch (error) {
       console.error(error);
