@@ -48,6 +48,13 @@
   display: flex;
   opacity: 0;
   transition: opacity 0.2s;
+  
+  button {
+    &:disabled {
+      cursor: not-allowed;
+      opacity: 0.5;
+    }
+  }
 }
 
 .editButton, .deleteButton {
@@ -55,13 +62,13 @@
   padding: 0 0.3rem;
   transition: color 0.2s;
   
-  &:hover {
+  &:hover:not(:disabled) {
     color: var(--primary-color);
   }
 }
 
 .deleteButton {
-  &:hover {
+  &:hover:not(:disabled) {
     color: var(--error-color);
   }
 }

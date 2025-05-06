@@ -79,6 +79,9 @@ export function LinkProvider({ children }) {
         // If logged in, load links from API
         if (isLoggedIn) {
           const res = await fetch("/api/links");
+          if (!res.ok) {
+            throw new Error("Failed to fetch links from API");
+          }
           const apiLinks = await res.json();
 
           // Mark API links as cloud links
@@ -230,9 +233,10 @@ export function LinkProvider({ children }) {
           throw new Error("Failed to update link");
         }
 
+        // Update in state
         setLinks((prevLinks) =>
           prevLinks.map((link) =>
-            link._id === id ? { ...link, ...data } : link
+            link._id === id ? { ...link, ...data, isCloudSaved: true } : link
           )
         );
         showNotification("Link updated successfully", "success");
@@ -335,7 +339,7 @@ export function LinkProvider({ children }) {
         const cloudLink = await res.json();
         successCount++;
 
-        // Replace local link with cloud link
+        // Replace local link with cloud link and mark as cloud saved
         setLinks((prevLinks) =>
           prevLinks.map((l) =>
             l._id === _id ? { ...cloudLink, isCloudSaved: true } : l
@@ -366,6 +370,11 @@ export function LinkProvider({ children }) {
     Cookies.remove("auth");
     setIsLoggedIn(false);
     setUsername("");
+    
+    // Reload links to reset the state
+    const allLinks = JSON.parse(localStorage.getItem("devlink_all_links") || "[]");
+    setLinks(allLinks);
+    
     showNotification(
       "Logged out successfully. Your links are still available on this device.",
       "info"

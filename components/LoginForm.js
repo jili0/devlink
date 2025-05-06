@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import styles from '../styles/LoginForm.module.scss';
 import { useLinks } from '../context/LinkContext';
@@ -11,6 +11,21 @@ const LoginForm = () => {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const { setIsLoggedIn, showNotification } = useLinks();
+
+  // Load saved credentials when component mounts
+  useEffect(() => {
+    // Try to get saved credentials from localStorage
+    try {
+      const savedCredentials = localStorage.getItem('devlink_credentials');
+      if (savedCredentials) {
+        const parsed = JSON.parse(savedCredentials);
+        setUsername(parsed.username || '');
+        setPassword(parsed.password || '');
+      }
+    } catch (e) {
+      console.error('Error loading saved credentials:', e);
+    }
+  }, []);
 
   const toggleMode = () => {
     setIsLogin(!isLogin);
@@ -38,7 +53,10 @@ const LoginForm = () => {
         throw new Error(data.message || (isLogin ? 'Login failed' : 'Registration failed'));
       }
 
-      // Save username to localStorage
+      // Save credentials to localStorage for next login
+      localStorage.setItem('devlink_credentials', JSON.stringify({ username, password }));
+
+      // Save username to localStorage for user identification
       localStorage.setItem('devlink_user', JSON.stringify({ 
         username: username, 
         id: data.user?.id 

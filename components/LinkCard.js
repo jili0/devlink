@@ -100,6 +100,9 @@ const LinkCard = ({ link, provided }) => {
 
   const titleStr = title || '';
   const displayTitle = titleStr.length > 40 ? `${titleStr.substring(0, 37)}...` : titleStr;
+  
+  // Decide whether to show actions buttons based on isLoggedIn and isCloudSaved
+  const showActions = !link.isCloudSaved || isLoggedIn;
 
   return (
     <div 
@@ -143,10 +146,12 @@ const LinkCard = ({ link, provided }) => {
           </a>
           
           <div className={styles.linkStatus}>
+            {/* Always show Local badge since all links are stored locally */}
             <span className={styles.localBadge} title="Stored locally">
               Local
             </span>
             
+            {/* Only show Cloud badge if it's actually saved in the cloud */}
             {link.isCloudSaved && (
               <span className={styles.cloudBadge} title="Stored in cloud">
                 Cloud
@@ -154,12 +159,13 @@ const LinkCard = ({ link, provided }) => {
             )}
           </div>
           
-          <div className={styles.actions}>
+          <div className={styles.actions} style={{ opacity: showActions ? '' : '0' }}>
             <button 
               className={styles.editButton} 
               onClick={handleEdit}
               aria-label="Edit"
               title={link.isCloudSaved && !isLoggedIn ? "Log in to edit" : "Edit link"}
+              disabled={link.isCloudSaved && !isLoggedIn}
             >
               ✎
             </button>
@@ -168,6 +174,7 @@ const LinkCard = ({ link, provided }) => {
               onClick={handleDelete}
               aria-label="Delete"
               title={link.isCloudSaved && !isLoggedIn ? "Log in to delete" : "Delete link"}
+              disabled={link.isCloudSaved && !isLoggedIn}
             >
               ×
             </button>
