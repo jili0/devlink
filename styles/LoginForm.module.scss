@@ -35,6 +35,26 @@
   }
 }
 
+.rememberMeContainer {
+  display: flex;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  
+  input[type="checkbox"] {
+    margin-right: 0.5rem;
+    width: auto;
+    cursor: pointer;
+  }
+  
+  label {
+    cursor: pointer;
+    font-size: 0.9rem;
+    color: var(--light-text);
+    font-weight: normal;
+    margin-bottom: 0;
+  }
+}
+
 .error {
   background-color: rgba(231, 76, 60, 0.1);
   color: var(--error-color);

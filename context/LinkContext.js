@@ -10,88 +10,140 @@ export function LinkProvider({ children }) {
   const [notification, setNotification] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [username, setUsername] = useState("");
+  const [authChecked, setAuthChecked] = useState(false);
 
-  // Check authentication and load user info
+  // Überprüfe Authentifizierung beim Komponenten-Mount und bei Änderungen
   useEffect(() => {
     const checkAuth = async () => {
       try {
+        // Direkte Cookie-Prüfung
         const token = Cookies.get("auth");
+        
+        // In Entwicklungsumgebung Debug-Logs anzeigen
+        if (process.env.NODE_ENV === 'development') {
+          console.log("LinkContext: Authentifizierungsprüfung gestartet");
+          console.log("Cookie vorhanden:", !!token);
+        }
 
         if (!token) {
           setIsLoggedIn(false);
           setUsername("");
+          setAuthChecked(true);
           return;
         }
 
-        const res = await fetch("/api/auth/verify");
+        // Serveranfrage mit explizitem credentials-Flag
+        const res = await fetch("/api/auth/verify", {
+          method: "GET",
+          headers: {
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0"
+          },
+          credentials: "include" // Wichtig für Cookie-Übertragung
+        });
+        
+        if (!res.ok) {
+          throw new Error("Verify API request failed: " + res.status);
+        }
+        
         const data = await res.json();
+        
+        if (process.env.NODE_ENV === 'development') {
+          console.log("Verify API Antwort:", data);
+        }
 
-        if (data.isLoggedIn) {
+        if (data.isLoggedIn && data.user) {
+          // Der Benutzer ist eingeloggt
           setIsLoggedIn(true);
-
-          // Try to get username from localStorage
-          try {
-            const userInfo = localStorage.getItem("devlink_user");
-            if (userInfo) {
-              const userData = JSON.parse(userInfo);
-              setUsername(userData.username || "");
-            } else if (data.user && data.user.username) {
-              // If we have username from the API but not in localStorage, save it
-              setUsername(data.user.username);
-              localStorage.setItem(
-                "devlink_user",
-                JSON.stringify({
-                  username: data.user.username,
-                  id: data.user.id,
-                })
-              );
-            }
-          } catch (e) {
-            console.error("Error loading user data:", e);
+          setUsername(data.user.username || "");
+          
+          if (process.env.NODE_ENV === 'development') {
+            console.log("Benutzer eingeloggt als:", data.user.username);
           }
         } else {
+          // Der Benutzer ist nicht eingeloggt
           setIsLoggedIn(false);
           setUsername("");
-          // Clear auth cookie if server says we're not logged in
-          Cookies.remove("auth");
+          
+          // Cookie entfernen, wenn der Server sagt, dass wir nicht eingeloggt sind
+          Cookies.remove("auth", { path: '/' });
+          
+          if (process.env.NODE_ENV === 'development') {
+            console.log("Benutzer nicht eingeloggt, Auth-Cookie entfernt");
+          }
         }
       } catch (error) {
-        console.error("Auth check failed:", error);
+        console.error("Authentifizierungsprüfung fehlgeschlagen:", error);
         setIsLoggedIn(false);
         setUsername("");
+      } finally {
+        setAuthChecked(true);
       }
     };
 
+    // Sofortige Authentifizierungsprüfung durchführen
     checkAuth();
+    
+    // Event-Listener für Fensterfokus hinzufügen
+    const handleFocus = () => checkAuth();
+    window.addEventListener("focus", handleFocus);
+    
+    // Bei Komponenten-Unmount Event-Listener entfernen
+    return () => {
+      window.removeEventListener("focus", handleFocus);
+    };
   }, []);
 
-  // Load links from localStorage and API when auth state changes
+  // Lade Links basierend auf dem Authentifizierungsstatus
   useEffect(() => {
+    // Nur ausführen, wenn die Authentifizierungsprüfung abgeschlossen ist
+    if (!authChecked) return;
+    
     const loadLinks = async () => {
       setIsLoading(true);
+      
+      if (process.env.NODE_ENV === 'development') {
+        console.log("Links werden geladen, Auth-Status:", isLoggedIn);
+      }
 
-      // Load local links from localStorage
+      // Lade lokale Links aus localStorage
       const localLinks = JSON.parse(
         localStorage.getItem("devlink_local_links") || "[]"
       );
+      
+      if (process.env.NODE_ENV === 'development') {
+        console.log("Lokale Links geladen:", localLinks.length);
+      }
 
       try {
-        // If logged in, load links from API
+        // Wenn eingeloggt, lade Links von der API
         if (isLoggedIn) {
-          const res = await fetch("/api/links");
+          const res = await fetch("/api/links", {
+            headers: {
+              "Cache-Control": "no-cache",
+              "Pragma": "no-cache"
+            },
+            credentials: "include" // Wichtig für Cookie-Übertragung
+          });
+          
           if (!res.ok) {
-            throw new Error("Failed to fetch links from API");
+            throw new Error("Fehler beim Abrufen der Links: " + res.status);
           }
+          
           const apiLinks = await res.json();
+          
+          if (process.env.NODE_ENV === 'development') {
+            console.log("Cloud-Links geladen:", apiLinks.length);
+          }
 
-          // Mark API links as cloud links
+          // API-Links als Cloud-Links markieren
           const cloudLinks = apiLinks.map((link) => ({
             ...link,
             isCloudSaved: true,
           }));
 
-          // Merge cloud links with local links
-          // (avoiding duplicates by checking _id)
+          // Lokale Links auf Duplikate prüfen
           const localOnlyLinks = localLinks.filter(
             (localLink) =>
               !cloudLinks.some(
@@ -102,53 +154,55 @@ export function LinkProvider({ children }) {
               )
           );
 
-          // Save cloud links to localStorage for offline use
+          // Alle Links kombinieren
           const mergedLinks = [...cloudLinks, ...localOnlyLinks];
-          localStorage.setItem(
-            "devlink_all_links",
-            JSON.stringify(mergedLinks)
-          );
-
           setLinks(mergedLinks);
+          
+          if (process.env.NODE_ENV === 'development') {
+            console.log("Alle Links geladen:", mergedLinks.length);
+          }
         } else {
-          // If not logged in, just use local links
+          // Nicht eingeloggt, verwende nur lokale Links
           setLinks(localLinks);
+          
+          if (process.env.NODE_ENV === 'development') {
+            console.log("Nicht eingeloggt, nur lokale Links angezeigt");
+          }
         }
       } catch (error) {
-        console.error("Failed to fetch links:", error);
-        // If API fails, fall back to local links
+        console.error("Fehler beim Laden der Links:", error);
         setLinks(localLinks);
-        showNotification("Failed to load cloud links", "error");
+        showNotification("Fehler beim Laden der Cloud-Links", "error");
       } finally {
         setIsLoading(false);
       }
     };
 
     loadLinks();
-  }, [isLoggedIn]);
+  }, [isLoggedIn, authChecked]);
 
-  // Save local links to localStorage whenever they change
+  // Lokale Links in localStorage speichern
   useEffect(() => {
     if (!isLoading) {
       const localLinks = links.filter((link) => !link.isCloudSaved);
       localStorage.setItem("devlink_local_links", JSON.stringify(localLinks));
-      localStorage.setItem("devlink_all_links", JSON.stringify(links));
     }
   }, [links, isLoading]);
 
+  // Benachrichtigungsfunktion
   const showNotification = (message, type = "info") => {
     setNotification({ message, type });
     setTimeout(() => setNotification(null), 3000);
   };
 
+  // Link hinzufügen
   const addLink = async (linkData) => {
-    // Validate that all required fields are present
     if (
       !linkData.title.trim() ||
       !linkData.url.trim() ||
       !linkData.category.trim()
     ) {
-      showNotification("Title, URL, and category are required", "error");
+      showNotification("Titel, URL und Kategorie sind erforderlich", "error");
       return;
     }
 
@@ -160,23 +214,23 @@ export function LinkProvider({ children }) {
             "Content-Type": "application/json",
           },
           body: JSON.stringify(linkData),
+          credentials: "include"
         });
 
         if (!res.ok) {
-          throw new Error("Failed to add link");
+          throw new Error("Fehler beim Hinzufügen des Links");
         }
 
         const newLink = await res.json();
-        // Mark link as cloud saved
         const cloudLink = { ...newLink, isCloudSaved: true };
         setLinks((prevLinks) => [...prevLinks, cloudLink]);
-        showNotification("Link added to cloud successfully", "success");
-        return cloudLink; // Return the link for reference
+        showNotification("Link zur Cloud hinzugefügt", "success");
+        return cloudLink;
       } catch (error) {
-        console.error("Error adding link:", error);
-        showNotification("Failed to add link to cloud", "error");
+        console.error("Fehler beim Hinzufügen des Links:", error);
+        showNotification("Fehler beim Hinzufügen des Links zur Cloud", "error");
 
-        // Fallback to local storage if API fails
+        // Fallback: lokales Speichern
         const localLink = {
           _id: uuidv4(),
           ...linkData,
@@ -184,11 +238,11 @@ export function LinkProvider({ children }) {
           isCloudSaved: false,
         };
         setLinks((prevLinks) => [...prevLinks, localLink]);
-        showNotification("Link saved locally", "info");
+        showNotification("Link lokal gespeichert", "info");
         return localLink;
       }
     } else {
-      // Add to local storage only
+      // Nur lokal speichern
       const localLink = {
         _id: uuidv4(),
         ...linkData,
@@ -196,26 +250,27 @@ export function LinkProvider({ children }) {
         isCloudSaved: false,
       };
       setLinks((prevLinks) => [...prevLinks, localLink]);
-      showNotification("Link saved locally", "success");
+      showNotification("Link lokal gespeichert", "success");
       return localLink;
     }
   };
 
+  // Link aktualisieren
   const updateLink = async (id, data) => {
     if (!id) {
-      showNotification("Invalid link ID", "error");
+      showNotification("Ungültige Link-ID", "error");
       return;
     }
 
     const linkToUpdate = links.find((link) => link._id === id);
 
     if (!linkToUpdate) {
-      showNotification("Link not found", "error");
+      showNotification("Link nicht gefunden", "error");
       return;
     }
 
     if (linkToUpdate.isCloudSaved && !isLoggedIn) {
-      showNotification("Please log in to edit cloud links", "error");
+      showNotification("Bitte anmelden, um Cloud-Links zu bearbeiten", "error");
       return;
     }
 
@@ -227,47 +282,48 @@ export function LinkProvider({ children }) {
             "Content-Type": "application/json",
           },
           body: JSON.stringify(data),
+          credentials: "include"
         });
 
         if (!res.ok) {
-          throw new Error("Failed to update link");
+          throw new Error("Fehler beim Aktualisieren des Links");
         }
 
-        // Update in state
         setLinks((prevLinks) =>
           prevLinks.map((link) =>
             link._id === id ? { ...link, ...data, isCloudSaved: true } : link
           )
         );
-        showNotification("Link updated successfully", "success");
+        showNotification("Link erfolgreich aktualisiert", "success");
       } catch (error) {
-        console.error("Error updating link:", error);
-        showNotification("Failed to update link", "error");
+        console.error("Fehler beim Aktualisieren des Links:", error);
+        showNotification("Fehler beim Aktualisieren des Links", "error");
       }
     } else {
-      // Update local link
+      // Lokalen Link aktualisieren
       setLinks((prevLinks) =>
         prevLinks.map((link) => (link._id === id ? { ...link, ...data } : link))
       );
-      showNotification("Local link updated successfully", "success");
+      showNotification("Lokaler Link aktualisiert", "success");
     }
   };
 
+  // Link löschen
   const deleteLink = async (id) => {
     if (!id) {
-      showNotification("Invalid link ID", "error");
+      showNotification("Ungültige Link-ID", "error");
       return;
     }
 
     const linkToDelete = links.find((link) => link._id === id);
 
     if (!linkToDelete) {
-      showNotification("Link not found", "error");
+      showNotification("Link nicht gefunden", "error");
       return;
     }
 
     if (linkToDelete.isCloudSaved && !isLoggedIn) {
-      showNotification("Please log in to delete cloud links", "error");
+      showNotification("Bitte anmelden, um Cloud-Links zu löschen", "error");
       return;
     }
 
@@ -275,45 +331,45 @@ export function LinkProvider({ children }) {
       if (linkToDelete.isCloudSaved && isLoggedIn) {
         const res = await fetch(`/api/links/${id}`, {
           method: "DELETE",
+          credentials: "include"
         });
 
         if (!res.ok) {
           const errorData = await res.json().catch(() => ({}));
-          throw new Error(errorData.message || "Failed to delete link");
+          throw new Error(errorData.message || "Fehler beim Löschen des Links");
         }
       }
 
-      // Always update local state, even if API call fails
       setLinks((prevLinks) => prevLinks.filter((link) => link._id !== id));
 
       showNotification(
         linkToDelete.isCloudSaved
-          ? "Link deleted successfully"
-          : "Local link deleted successfully",
+          ? "Link erfolgreich gelöscht"
+          : "Lokaler Link erfolgreich gelöscht",
         "success"
       );
     } catch (error) {
-      console.error("Error deleting link:", error);
+      console.error("Fehler beim Löschen des Links:", error);
 
-      // For local links, still remove from state even if API fails
       if (!linkToDelete.isCloudSaved) {
         setLinks((prevLinks) => prevLinks.filter((link) => link._id !== id));
-        showNotification("Local link deleted successfully", "success");
+        showNotification("Lokaler Link erfolgreich gelöscht", "success");
       } else {
-        showNotification("Failed to delete link: " + error.message, "error");
+        showNotification("Fehler beim Löschen des Links: " + error.message, "error");
       }
     }
   };
 
+  // Lokale Links mit der Cloud synchronisieren
   const syncLocalLinks = async () => {
     if (!isLoggedIn) {
-      showNotification("Please log in to sync links", "error");
+      showNotification("Bitte anmelden, um Links zu synchronisieren", "error");
       return;
     }
 
     const localLinks = links.filter((link) => !link.isCloudSaved);
     if (localLinks.length === 0) {
-      showNotification("No local links to sync", "info");
+      showNotification("Keine lokalen Links zum Synchronisieren", "info");
       return;
     }
 
@@ -330,23 +386,23 @@ export function LinkProvider({ children }) {
             "Content-Type": "application/json",
           },
           body: JSON.stringify(linkData),
+          credentials: "include"
         });
 
         if (!res.ok) {
-          throw new Error("Failed to sync link");
+          throw new Error("Fehler beim Synchronisieren des Links");
         }
 
         const cloudLink = await res.json();
         successCount++;
 
-        // Replace local link with cloud link and mark as cloud saved
         setLinks((prevLinks) =>
           prevLinks.map((l) =>
             l._id === _id ? { ...cloudLink, isCloudSaved: true } : l
           )
         );
       } catch (error) {
-        console.error("Error syncing link:", error);
+        console.error("Fehler beim Synchronisieren des Links:", error);
         failCount++;
       }
     }
@@ -355,49 +411,53 @@ export function LinkProvider({ children }) {
 
     if (successCount > 0 && failCount > 0) {
       showNotification(
-        `Synced ${successCount} links, ${failCount} failed`,
+        `${successCount} Links synchronisiert, ${failCount} fehlgeschlagen`,
         "info"
       );
     } else if (successCount > 0) {
-      showNotification(`Successfully synced ${successCount} links`, "success");
+      showNotification(`${successCount} Links erfolgreich synchronisiert`, "success");
     } else if (failCount > 0) {
-      showNotification(`Failed to sync ${failCount} links`, "error");
+      showNotification(`Fehler beim Synchronisieren von ${failCount} Links`, "error");
     }
   };
 
-  // Handle logout
+  // Abmelden
   const logout = () => {
-    Cookies.remove("auth");
+    // Auth-Cookie entfernen
+    Cookies.remove("auth", { path: '/' });
+    
+    // Auth-Status zurücksetzen
     setIsLoggedIn(false);
     setUsername("");
     
-    // Reload links to reset the state
-    const allLinks = JSON.parse(localStorage.getItem("devlink_all_links") || "[]");
-    setLinks(allLinks);
+    // Nach dem Logout nur lokale Links anzeigen
+    const localLinks = links.filter(link => !link.isCloudSaved);
+    setLinks(localLinks);
     
     showNotification(
-      "Logged out successfully. Your links are still available on this device.",
+      "Erfolgreich abgemeldet. Deine Links sind weiterhin auf diesem Gerät verfügbar.",
       "info"
     );
   };
 
+  // Context-Wert
+  const contextValue = {
+    links,
+    isLoggedIn,
+    setIsLoggedIn,
+    notification,
+    isLoading,
+    username,
+    addLink,
+    updateLink,
+    deleteLink,
+    syncLocalLinks,
+    showNotification,
+    logout,
+  };
+
   return (
-    <LinkContext.Provider
-      value={{
-        links,
-        isLoggedIn,
-        setIsLoggedIn,
-        notification,
-        isLoading,
-        username,
-        addLink,
-        updateLink,
-        deleteLink,
-        syncLocalLinks,
-        showNotification,
-        logout,
-      }}
-    >
+    <LinkContext.Provider value={contextValue}>
       {children}
     </LinkContext.Provider>
   );

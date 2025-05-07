@@ -7,23 +7,25 @@ const LoginForm = () => {
   const [isLogin, setIsLogin] = useState(true);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(true); // Standard: aktiviert
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const { setIsLoggedIn, showNotification } = useLinks();
 
-  // Load saved credentials when component mounts
+  // Lade nur den Benutzernamen, nicht das Passwort
   useEffect(() => {
-    // Try to get saved credentials from localStorage
     try {
-      const savedCredentials = localStorage.getItem('devlink_credentials');
-      if (savedCredentials) {
-        const parsed = JSON.parse(savedCredentials);
-        setUsername(parsed.username || '');
-        setPassword(parsed.password || '');
+      // Versuche, gespeicherten Benutzernamen zu laden
+      const userInfo = localStorage.getItem('devlink_user');
+      if (userInfo) {
+        const userData = JSON.parse(userInfo);
+        if (userData.username) {
+          setUsername(userData.username);
+        }
       }
     } catch (e) {
-      console.error('Error loading saved credentials:', e);
+      console.error('Fehler beim Laden des Benutzernamens:', e);
     }
   }, []);
 
@@ -44,19 +46,23 @@ const LoginForm = () => {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ 
+          username, 
+          password, 
+          rememberMe // Sende die rememberMe-Option an den Server
+        }),
+        credentials: 'include', // Wichtig für Cookie-Handhabung
       });
 
-      const data = await res.json();
-
       if (!res.ok) {
-        throw new Error(data.message || (isLogin ? 'Login failed' : 'Registration failed'));
+        const data = await res.json();
+        throw new Error(data.message || (isLogin ? 'Login fehlgeschlagen' : 'Registrierung fehlgeschlagen'));
       }
 
-      // Save credentials to localStorage for next login
-      localStorage.setItem('devlink_credentials', JSON.stringify({ username, password }));
+      // Erfolgreiche Antwort verarbeiten
+      const data = await res.json();
 
-      // Save username to localStorage for user identification
+      // Speichere nur Benutzername und ID, niemals das Passwort
       localStorage.setItem('devlink_user', JSON.stringify({ 
         username: username, 
         id: data.user?.id 
@@ -65,13 +71,17 @@ const LoginForm = () => {
       setIsLoggedIn(true);
       showNotification(
         isLogin 
-          ? 'Login successful! Local links can now be synced to the cloud.'
-          : 'Registration successful! Your local links are now available in the cloud.',
+          ? `Login erfolgreich! ${rememberMe ? 'Du bleibst für 30 Tage angemeldet.' : 'Du bleibst für 24 Stunden angemeldet.'}`
+          : 'Registrierung erfolgreich! Deine lokalen Links sind jetzt in der Cloud verfügbar.',
         'success'
       );
-      router.push('/');
+      
+      // Kurze Verzögerung, um sicherzustellen, dass der Status aktualisiert wird
+      setTimeout(() => {
+        router.push('/');
+      }, 100);
     } catch (error) {
-      setError(error.message);
+      setError(error.message || 'Ein unbekannter Fehler ist aufgetreten');
     } finally {
       setLoading(false);
     }
@@ -102,18 +112,29 @@ const LoginForm = () => {
             required
           />
         </div>
+        <div className={styles.rememberMeContainer}>
+          <input
+            type="checkbox"
+            id="rememberMe"
+            checked={rememberMe}
+            onChange={(e) => setRememberMe(e.target.checked)}
+          />
+          <label htmlFor="rememberMe">
+            Angemeldet bleiben (30 Tage)
+          </label>
+        </div>
         <button 
           type="submit" 
           disabled={loading}
           className={styles.submitButton}
         >
-          {loading ? (isLogin ? 'Logging in...' : 'Registering...') : (isLogin ? 'Login' : 'Register')}
+          {loading ? (isLogin ? 'Anmelden...' : 'Registrieren...') : (isLogin ? 'Anmelden' : 'Registrieren')}
         </button>
       </form>
       <div className={styles.toggleMode}>
-        {isLogin ? "Don't have an account? " : "Already have an account? "}
+        {isLogin ? "Noch kein Konto? " : "Bereits ein Konto? "}
         <button type="button" onClick={toggleMode}>
-          {isLogin ? 'Register' : 'Login'}
+          {isLogin ? 'Registrieren' : 'Anmelden'}
         </button>
       </div>
     </div>
