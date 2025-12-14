@@ -1,5 +1,5 @@
 import React from 'react';
-import { Droppable, Draggable } from 'react-beautiful-dnd';
+import { Droppable, Draggable } from '@hello-pangea/dnd';
 import LinkCard from './LinkCard';
 import styles from '../styles/CategoryColumn.module.scss';
 

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { DragDropContext } from 'react-beautiful-dnd';
+import { DragDropContext } from '@hello-pangea/dnd';
 import Header from '../components/Header';
 import Notification from '../components/Notification';
 import { LinkProvider } from '../context/LinkContext';
